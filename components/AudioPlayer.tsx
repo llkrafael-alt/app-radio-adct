@@ -23,7 +23,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         artist: churchName,
         album: "Web Rádio",
         artwork: [
-          { src: 'https://cdn-icons-png.flaticon.com/512/3083/3083417.png', sizes: '512x512', type: 'image/png' }
+          { src: 'https://raw.githubusercontent.com/llkrafael-alt/adchegatudo/main/icon.png', sizes: '512x512', type: 'image/png' }
         ]
       });
 
