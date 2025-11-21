@@ -10,6 +10,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // retryKey serve para forçar o useEffect a rodar de novo e recriar o áudio do zero
+  const [retryKey, setRetryKey] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Verifica se existe uma URL válida
@@ -28,9 +30,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
       });
 
       navigator.mediaSession.setActionHandler('play', () => {
-        if (audioRef.current) {
-          audioRef.current.play().catch(e => console.error("Remote play failed", e));
-        }
+        handlePlay();
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
@@ -46,7 +46,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
          }
       });
     }
-  }, [churchName]);
+  }, [churchName, retryKey]); // Atualiza actions quando retryKey muda
 
   // Atualiza estado de reprodução na Media Session
   useEffect(() => {
@@ -55,6 +55,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
     }
   }, [isPlaying]);
 
+  // Efeito principal de Áudio - Recria o objeto Audio quando streamUrl ou retryKey mudam
   useEffect(() => {
     if (!hasStream) {
       setIsPlaying(false);
@@ -63,17 +64,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
       return;
     }
 
-    // Limpa instância anterior se houver
+    // Limpa instância anterior
     if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.removeAttribute('src');
+        audioRef.current.load();
         audioRef.current = null;
     }
 
     try {
-      // Criar o áudio e anexar ao window para evitar Garbage Collection em background
-      const audio = new Audio(streamUrl);
+      // Adiciona timestamp para evitar cache de conexões mortas/stale
+      const separator = streamUrl.includes('?') ? '&' : '?';
+      const freshUrl = `${streamUrl}${separator}nocache=${Date.now()}`;
       
-      // Atributos importantes para mobile
+      console.log(`[AudioPlayer] Inicializando stream: ${freshUrl}`);
+
+      const audio = new Audio(freshUrl);
+      audio.crossOrigin = "anonymous"; // Ajuda em alguns casos de CORS
+      
+      // Atributos para mobile e persistência
       audio.setAttribute('playsinline', 'true');
       audio.setAttribute('webkit-playsinline', 'true');
       
@@ -85,36 +94,65 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
       audio.preload = 'none';
 
       const onPlay = () => {
+        console.log("[AudioPlayer] Event: Play");
         setIsPlaying(true);
         setIsLoading(false);
         setError(null);
       };
 
       const onPause = () => {
-        setIsPlaying(false);
+        console.log("[AudioPlayer] Event: Pause");
+        // Só define como pausado se não estivermos carregando (buffer)
+        // Isso evita piscar o botão quando o audio trava por buffer
+        if (audio.readyState >= 3 || audio.paused) {
+           setIsPlaying(false);
+        }
       };
 
       const onWaiting = () => {
+        console.log("[AudioPlayer] Event: Waiting (Buffering)");
         if (isPlaying) setIsLoading(true);
       };
 
+      const onPlaying = () => {
+        console.log("[AudioPlayer] Event: Playing");
+        setIsPlaying(true);
+        setIsLoading(false);
+      }
+
       const onError = (e: Event) => {
-        console.error("Erro de reprodução:", e);
+        const target = e.target as HTMLAudioElement;
+        let errorMessage = "Rádio indisponível.";
+        
+        if (target.error) {
+            switch (target.error.code) {
+                case 1: errorMessage = "Reprodução abortada."; break;
+                case 2: errorMessage = "Erro de rede. Tentando reconectar..."; break;
+                case 3: errorMessage = "Erro de decodificação."; break;
+                case 4: errorMessage = "Formato não suportado."; break;
+                default: errorMessage = `Erro desconhecido (${target.error.code})`;
+            }
+            console.error(`[AudioPlayer] Error Code: ${target.error.code} - ${target.error.message}`);
+        } else {
+            console.error("[AudioPlayer] Unknown Error Event", e);
+        }
+
         setIsPlaying(false);
         setIsLoading(false);
-        setError("Rádio indisponível no momento.");
+        setError(errorMessage);
       };
 
       audio.addEventListener('play', onPlay);
-      audio.addEventListener('playing', onPlay);
+      audio.addEventListener('playing', onPlaying);
       audio.addEventListener('pause', onPause);
       audio.addEventListener('waiting', onWaiting);
       audio.addEventListener('error', onError);
 
       return () => {
+        console.log("[AudioPlayer] Cleanup");
         audio.pause();
         audio.removeEventListener('play', onPlay);
-        audio.removeEventListener('playing', onPlay);
+        audio.removeEventListener('playing', onPlaying);
         audio.removeEventListener('pause', onPause);
         audio.removeEventListener('waiting', onWaiting);
         audio.removeEventListener('error', onError);
@@ -125,29 +163,81 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         }
       };
     } catch (e) {
-      console.error("Erro ao inicializar áudio:", e);
-      setError("Erro na URL da rádio.");
+      console.error("Erro crítico ao criar Audio:", e);
+      setError("Erro interno no player.");
     }
-  }, [streamUrl, hasStream]);
+  }, [streamUrl, hasStream, retryKey]); // Dependência retryKey força recriação
 
-  const togglePlay = async () => {
+  const handlePlay = async () => {
     if (!hasStream) return;
-    if (!audioRef.current) return;
 
-    if (isPlaying) {
+    // Se estiver tocando, pausa
+    if (isPlaying && audioRef.current) {
       audioRef.current.pause();
-    } else {
-      setError(null);
-      setIsLoading(true);
-      try {
-        await audioRef.current.play();
-      } catch (err) {
-        console.error("Playback failed", err);
-        setIsLoading(false);
-        setError("Clique play novamente.");
+      return;
+    }
+
+    // Se tiver erro ou não tiver audioRef (player morreu), recria tudo
+    if (error || !audioRef.current) {
+        console.log("[AudioPlayer] Tentando reconexão forçada...");
+        setIsLoading(true);
+        setError(null);
+        setRetryKey(prev => prev + 1); // Isso dispara o useEffect acima
+        // O useEffect vai criar o audio e precisamos dar play nele assim que estiver pronto.
+        // Como o useEffect é assíncrono no React, fazemos um pequeno "auto-play" na próxima renderização via ref ou logicamente o usuário clica de novo se falhar.
+        // Melhor abordagem: Forçar o play no novo audio instance dentro do useEffect? Não, browsers bloqueiam.
+        // Vamos deixar o useEffect criar e esperamos o usuario clicar ou tentamos play imediato se for retry?
+        // Vamos tentar dar play na nova instância via setTimeout é arriscado.
+        // Melhor UX: Ao clicar em play com erro, setRetryKey reseta o player. 
+        // O usuário pode precisar clicar novamente ou podemos tentar automação.
+        
+        // Estratégia simples: Se tem erro, o clique reseta o player.
+        // Precisamos dar um pequeno tempo para o player ser recriado antes de dar play, 
+        // mas no React isso é complexo.
+        // Vamos fazer o seguinte: Ao mudar o retryKey, o player nasce "pausado". 
+        // O usuário clica e ele toca.
+        // Para melhorar: vamos tentar dar play na proxima renderização? Não.
+        // Vamos apenas limpar o erro e tentar dar play no player ATUAL se ele existir, se não existir (null), o retryKey resolve.
+        return; 
+    }
+
+    // Fluxo normal (sem erro, player existe)
+    setError(null);
+    setIsLoading(true);
+    try {
+      const p = audioRef.current.play();
+      if (p !== undefined) {
+          p.catch(err => {
+              console.error("Playback promise failed", err);
+              setIsLoading(false);
+              setError("Falha ao iniciar. Tente novamente.");
+              // Se falhar o play (ex: rede), força recriação no próximo clique
+              if (err.name === 'NotSupportedError' || err.message.includes('source')) {
+                  // Marca erro para o próximo clique recriar
+                  setError("Sinal perdido. Clique para reconectar.");
+              }
+          });
       }
+    } catch (err) {
+      console.error("Playback sync failed", err);
+      setIsLoading(false);
     }
   };
+
+  // Helper para clique no botão (encapsula lógica de retry se necessário)
+  const onToggleClick = () => {
+      if (error) {
+          // Se tem erro, forçamos recriação imediata E tentamos tocar após breve delay
+          setRetryKey(prev => prev + 1);
+          setTimeout(() => {
+              // Tenta capturar a nova referencia
+              const newAudio = (window as any).radioInstance;
+              if (newAudio) newAudio.play().catch(() => {});
+          }, 100);
+      } else {
+          handlePlay();
+      }
+  }
 
   return (
     <div className="fixed bottom-0 left-0 w-full bg-gray-800/95 backdrop-blur-md border-t border-gray-700 p-4 pb-6 md:pb-4 z-50 shadow-2xl">
@@ -169,7 +259,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
 
         {/* Main Control */}
         <button
-          onClick={togglePlay}
+          onClick={onToggleClick}
           disabled={!hasStream}
           className={`relative group flex items-center justify-center w-16 h-16 rounded-full shadow-lg hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-blue-500/50 ${
             !hasStream ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-white text-gray-900'
