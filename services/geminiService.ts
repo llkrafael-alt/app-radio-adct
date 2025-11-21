@@ -1,6 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DailyMessage } from "../types";
 
+// CORREÇÃO DE BUILD: Ensina ao TypeScript que 'process' existe neste contexto
+declare const process: { env: { API_KEY: string } };
+
 const CACHE_KEY = 'daily_message_cache_v1';
 
 const getClient = () => {
