@@ -1,0 +1,22 @@
+{
+  "short_name": "Rádio Esperança",
+  "name": "Rádio Esperança Viva",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3083/3083417.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3083/3083417.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#111827",
+  "background_color": "#111827",
+  "orientation": "portrait",
+  "description": "Web rádio simples e moderna para igrejas."
+}
