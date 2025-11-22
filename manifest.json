@@ -1,6 +1,6 @@
 {
-  "short_name": "Rádio Esperança",
-  "name": "Rádio Esperança Viva",
+  "short_name": "AD Chega Tudo",
+  "name": "Rádio AD Chega Tudo",
   "icons": [
     {
       "src": "https://raw.githubusercontent.com/llkrafael-alt/adchegatudo/main/icon.png",
@@ -18,5 +18,5 @@
   "theme_color": "#111827",
   "background_color": "#111827",
   "orientation": "portrait",
-  "description": "Web rádio simples e moderna para igrejas."
+  "description": "Web rádio oficial da AD Chega Tudo."
 }
