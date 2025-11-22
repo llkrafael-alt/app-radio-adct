@@ -62,15 +62,20 @@ export const getRadioConfig = async (): Promise<RadioConfig & { error?: string }
         
         // Mapeamento Flexível
         const foundStreamUrl = json.streamUrl || json.stream || json.url || json.radio || json.link;
-        const foundImages = json.images || json.imgs || json.photos || [];
         const foundName = json.churchName || json.name || json.title || "Web Rádio";
+        let rawImages = json.images || json.imgs || json.photos || [];
+
+        // FILTRO DE SEGURANÇA: Remove o ícone se ele tiver entrado na lista de imagens por engano
+        const filteredImages = Array.isArray(rawImages) 
+          ? rawImages.filter((img: string) => !img.toLowerCase().includes('icon.png'))
+          : [];
 
         if (foundStreamUrl) {
           console.log("[Config] Sucesso! Configuração válida encontrada na nuvem.");
           return {
             churchName: foundName,
             streamUrl: foundStreamUrl,
-            images: foundImages.length > 0 ? foundImages : DEFAULT_CONFIG.images,
+            images: filteredImages.length > 0 ? filteredImages : DEFAULT_CONFIG.images,
             primaryColor: json.primaryColor || DEFAULT_CONFIG.primaryColor
           };
         } else {
