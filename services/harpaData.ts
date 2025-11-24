@@ -91,7 +91,8 @@ export const getHarpaHymns = async (): Promise<Hymn[]> => {
     try {
         localStorage.setItem(HARPA_CACHE_KEY, JSON.stringify(sortedHymns));
     } catch (cacheError) {
-        console.warn("[Harpa] Memória cheia, não foi possível salvar offline:", cacheError);
+        // Este catch é crucial para evitar o erro "QuotaExceededError" se a memória do celular estiver cheia
+        console.warn("[Harpa] Não foi possível salvar offline (limite de memória ou erro):", cacheError);
     }
 
     return sortedHymns;
@@ -104,6 +105,10 @@ export const getHarpaHymns = async (): Promise<Hymn[]> => {
 };
 
 export const forceUpdateHymns = async (): Promise<Hymn[]> => {
-    localStorage.removeItem(HARPA_CACHE_KEY);
+    try {
+        localStorage.removeItem(HARPA_CACHE_KEY);
+    } catch (e) {
+        console.warn("Erro ao limpar cache", e);
+    }
     return getHarpaHymns();
 };

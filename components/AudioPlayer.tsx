@@ -21,14 +21,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
   // Configuração da Media Session (Controles na tela de bloqueio/Android)
   useEffect(() => {
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: "Rádio Ao Vivo",
-        artist: churchName,
-        album: "Web Rádio",
-        artwork: [
-          { src: 'https://raw.githubusercontent.com/llkrafael-alt/adchegatudo/main/icon.png', sizes: '512x512', type: 'image/png' }
-        ]
-      });
+      // Verifica se MediaMetadata é suportado antes de instanciar
+      if (typeof MediaMetadata !== 'undefined') {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: "Rádio Ao Vivo",
+          artist: churchName,
+          album: "Web Rádio",
+          artwork: [
+            { src: 'https://raw.githubusercontent.com/llkrafael-alt/adchegatudo/main/icon.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+      }
 
       navigator.mediaSession.setActionHandler('play', () => {
         handlePlay();
@@ -103,21 +106,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
       // Atributos para mobile e persistência
       audio.setAttribute('playsinline', 'true');
       audio.setAttribute('webkit-playsinline', 'true');
+      audio.preload = 'auto'; // Força o carregamento para tentar o play imediato
       
       audioRef.current = audio;
       
       // Hack para impedir que o Android mate o processo de áudio
       (window as any).radioInstance = audio;
 
-      audio.preload = 'none';
-
       // Se for uma reconexão (retryKey > 0), tenta dar play automático
-      // Isso é necessário porque o autoplay é bloqueado, mas se o contexto já foi iniciado pelo usuário, pode funcionar.
       if (retryKey > 0) {
         // Pequeno delay para garantir que o objeto está pronto
-        setTimeout(() => {
-           audio.play().catch(e => console.warn("Autoplay na reconexão bloqueado:", e));
-        }, 150);
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(e => {
+                console.warn("Autoplay na reconexão bloqueado ou interrompido:", e);
+                // Se falhar o autoplay, reseta o estado para o usuário clicar de novo
+                setIsLoading(false);
+                setIsPlaying(false);
+            });
+        }
       }
 
       const onPlay = () => {
@@ -129,8 +136,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
 
       const onPause = () => {
         console.log("[AudioPlayer] Event: Pause");
-        // Só define como pausado se não estivermos carregando (buffer) ou tentando reconectar
+        // Só define como pausado se não estivermos carregando (buffer) ou tentando reconectar intencionalmente
         if (audio.readyState >= 3 || audio.paused) {
+           // Não atualiza estado se estivermos no meio de um retry intencional
+           // (mas aqui não temos acesso fácil ao escopo do handlePlay, então confiamos no unmount)
            setIsPlaying(false);
         }
       };
@@ -201,6 +210,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         console.log("[AudioPlayer] Cleanup");
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         audio.pause();
+        audio.removeAttribute('src'); // Garante que o buffer pare de baixar
+        audio.load(); // Reseta o elemento
         audio.removeEventListener('play', onPlay);
         audio.removeEventListener('playing', onPlaying);
         audio.removeEventListener('pause', onPause);
@@ -227,12 +238,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
     }
 
     // LÓGICA DE "AO VIVO":
-    // Se estiver pausado (ou com erro), não damos apenas .play().
-    // Forçamos uma recarga completa (setRetryKey) para que o áudio
-    // pule para o momento atual (live edge) e não toque o buffer antigo.
+    // Se estiver pausado, força destruição do objeto antigo para não retomar do buffer velho.
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0; // Tenta zerar tempo
+    }
+
     console.log("[AudioPlayer] Botão Play: Sincronizando com Ao Vivo...");
     setIsLoading(true);
     setError(null);
+    // Incrementa a chave para forçar o useEffect a rodar novamente e criar nova conexão
     setRetryKey(prev => prev + 1);
   };
 
@@ -279,12 +294,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
           )}
         </button>
 
-        {/* Visualizer (Decorative) - Always visible now */}
-        <div className="flex w-16 md:w-24 items-end gap-1 h-8">
+        {/* Visualizer (Decorative) - SEMPRE VISÍVEL (Mobile e Desktop) */}
+        <div className="flex w-20 md:w-24 items-end gap-1 h-8">
           {[...Array(5)].map((_, i) => (
             <div
               key={i}
-              className={`w-full bg-gray-500 rounded-t-sm ${isPlaying ? 'visualizer-bar' : 'h-1'}`}
+              className={`w-full rounded-t-sm ${isPlaying ? 'visualizer-bar' : 'h-1'}`}
               style={{ 
                 animationDuration: `${0.6 + i * 0.1}s`,
                 animationPlayState: isPlaying ? 'running' : 'paused',
