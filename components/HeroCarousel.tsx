@@ -39,8 +39,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
       onMouseDown={() => setIsPaused(true)}
       onMouseUp={() => setIsPaused(false)}
     >
-      {/* Overlay Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-gray-900 z-10 pointer-events-none" />
+      {/* Overlay Gradient - Ajustado para ser sutil e não cobrir a imagem principal */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-gray-900/90 z-20 pointer-events-none" />
       
       {/* Images */}
       {images.map((img, index) => (
@@ -50,10 +50,17 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
             index === currentIndex ? 'opacity-100' : 'opacity-0'
           }`}
         >
+          {/* Camada de Fundo (Desfocada para preencher o espaço vazio) */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center blur-3xl opacity-50 scale-110"
+            style={{ backgroundImage: `url(${img})` }}
+          />
+
+          {/* Imagem Principal (Ajustada para não cortar nada) */}
           <img
             src={img}
             alt={`Slide ${index + 1}`}
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain z-10"
             draggable={false}
           />
         </div>
@@ -87,8 +94,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
         </svg>
       </button>
 
-      {/* Pause Indicator (Opcional: mostra ícone pequeno quando pausado) */}
-      <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 transition-opacity duration-300 pointer-events-none ${isPaused ? 'opacity-100' : 'opacity-0'}`}>
+      {/* Pause Indicator */}
+      <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 transition-opacity duration-300 pointer-events-none ${isPaused ? 'opacity-100' : 'opacity-0'}`}>
          <div className="bg-black/40 backdrop-blur-md p-4 rounded-full">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white/80">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
@@ -97,7 +104,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
       </div>
 
       {/* Indicators */}
-      <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
+      <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-30 flex space-x-2">
         {images.map((_, index) => (
           <button
             key={index}
