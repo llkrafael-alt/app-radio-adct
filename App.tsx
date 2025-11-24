@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import HeroCarousel from './components/HeroCarousel';
 import AudioPlayer from './components/AudioPlayer';
+import HarpaCrista from './components/HarpaCrista'; // Importação da Harpa
 import { RadioConfig } from './types';
 import { getRadioConfig } from './services/configService';
 
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [config, setConfig] = useState<ConfigWithDebug | null>(null);
   const [loading, setLoading] = useState(true);
   const [showErrorBanner, setShowErrorBanner] = useState(true);
+  const [showHarpa, setShowHarpa] = useState(false); // Estado para controlar a Harpa
 
   useEffect(() => {
     getRadioConfig().then((data) => {
@@ -31,7 +33,6 @@ const App: React.FC = () => {
 
   if (!config) return null;
 
-  // Se não tivermos NEM a URL padrão, aí sim mostramos erro bloqueante (muito raro acontecer)
   if (!config.streamUrl) {
       return (
           <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-8">
@@ -44,7 +45,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-900 relative overflow-hidden">
+    <div className="h-screen bg-gray-900 relative overflow-hidden font-sans">
       
       {/* Aviso de Erro Não Bloqueante (Toast) */}
       {config.error && showErrorBanner && (
@@ -69,6 +70,17 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* BOTÃO DA HARPA CRISTÃ - VISÍVEL NO TOPO DIREITO */}
+      <button
+        onClick={() => setShowHarpa(true)}
+        className="absolute top-4 right-4 z-40 flex items-center justify-center w-12 h-12 rounded-full bg-black/40 backdrop-blur-md text-white border border-white/10 shadow-lg hover:bg-black/60 transition-all active:scale-95"
+        aria-label="Abrir Harpa Cristã"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      </button>
+
       {/* Hero Section with Carousel (Full Screen Background) */}
       <div className="absolute inset-0 z-0">
          <HeroCarousel images={config.images} />
@@ -80,6 +92,9 @@ const App: React.FC = () => {
         churchName={config.churchName}
         color={config.primaryColor} 
       />
+
+      {/* Modal da Harpa Cristã */}
+      <HarpaCrista isOpen={showHarpa} onClose={() => setShowHarpa(false)} />
     </div>
   );
 };
