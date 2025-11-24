@@ -220,35 +220,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
   const handlePlay = async () => {
     if (!hasStream) return;
 
+    // Se já estiver tocando, apenas pausa.
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       return;
     }
 
-    if (error || !audioRef.current) {
-        console.log("[AudioPlayer] Botão Play: Forçando reinicialização...");
-        setIsLoading(true);
-        setError(null);
-        setRetryKey(prev => prev + 1);
-        return; 
-    }
-
-    setError(null);
+    // LÓGICA DE "AO VIVO":
+    // Se estiver pausado (ou com erro), não damos apenas .play().
+    // Forçamos uma recarga completa (setRetryKey) para que o áudio
+    // pule para o momento atual (live edge) e não toque o buffer antigo.
+    console.log("[AudioPlayer] Botão Play: Sincronizando com Ao Vivo...");
     setIsLoading(true);
-    try {
-      const p = audioRef.current.play();
-      if (p !== undefined) {
-          p.catch(err => {
-              console.error("Playback promise failed", err);
-              setIsLoading(false);
-              // Se falhar o play (ex: rede), força recriação no próximo clique
-              setError("Toque para reconectar.");
-          });
-      }
-    } catch (err) {
-      console.error("Playback sync failed", err);
-      setIsLoading(false);
-    }
+    setError(null);
+    setRetryKey(prev => prev + 1);
   };
 
   return (
@@ -294,8 +279,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
           )}
         </button>
 
-        {/* Visualizer (Decorative) */}
-        <div className="flex items-end gap-1 h-8 w-16 md:w-24">
+        {/* Visualizer (Decorative) - Always visible now */}
+        <div className="flex w-16 md:w-24 items-end gap-1 h-8">
           {[...Array(5)].map((_, i) => (
             <div
               key={i}
