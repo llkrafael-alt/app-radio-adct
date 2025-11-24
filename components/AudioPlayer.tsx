@@ -295,7 +295,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         </button>
 
         {/* Visualizer (Decorative) */}
-        <div className="hidden md:flex items-end gap-1 h-8 w-24">
+        <div className="flex items-end gap-1 h-8 w-16 md:w-24">
           {[...Array(5)].map((_, i) => (
             <div
               key={i}
