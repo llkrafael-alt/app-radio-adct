@@ -31,7 +31,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
 
   return (
     <div 
-      className="relative w-full h-screen overflow-hidden bg-gray-900 transition-all duration-500 group select-none"
+      className="relative w-full h-full overflow-hidden bg-black transition-all duration-500 group select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={() => setIsPaused(true)}
@@ -39,28 +39,20 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
       onMouseDown={() => setIsPaused(true)}
       onMouseUp={() => setIsPaused(false)}
     >
-      {/* Overlay Gradient - Ajustado para ser sutil e não cobrir a imagem principal */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-gray-900/90 z-20 pointer-events-none" />
       
       {/* Images */}
       {images.map((img, index) => (
         <div
           key={index}
-          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out flex items-center justify-center ${
             index === currentIndex ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {/* Camada de Fundo (Desfocada para preencher o espaço vazio) */}
-          <div 
-            className="absolute inset-0 bg-cover bg-center blur-3xl opacity-50 scale-110"
-            style={{ backgroundImage: `url(${img})` }}
-          />
-
-          {/* Imagem Principal (Ajustada para não cortar nada) */}
+          {/* Imagem Principal - Sem sobreposições, sem filtros */}
           <img
             src={img}
             alt={`Slide ${index + 1}`}
-            className="absolute inset-0 w-full h-full object-contain z-10"
+            className="w-full h-full object-contain"
             draggable={false}
           />
         </div>
@@ -104,7 +96,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
       </div>
 
       {/* Indicators */}
-      <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-30 flex space-x-2">
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30 flex space-x-2">
         {images.map((_, index) => (
           <button
             key={index}

@@ -59,18 +59,34 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
     }
   }, [isPlaying]);
 
-  // Listener global de rede (Online/Offline)
+  // Listener global de rede (Online/Offline) e VISIBILIDADE (Acordar o app)
   useEffect(() => {
     const handleOnline = () => {
       console.log("[AudioPlayer] Rede detectada (Online). Verificando conexão...");
-      // Se estava com erro ou deveria estar tocando, força reconexão
       if (error || isPlaying) {
          setRetryKey(prev => prev + 1);
       }
     };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[AudioPlayer] App acordou (Visible).");
+        // Se estava tocando e parou misteriosamente (sistema matou o áudio), ou se tem erro, tenta reconectar.
+        // Não forçamos o play se estava pausado intencionalmente, mas preparamos o terreno.
+        if (audioRef.current && isPlaying && audioRef.current.paused) {
+           console.log("[AudioPlayer] Áudio estava pausado pelo sistema. Tentando retomar...");
+           setRetryKey(prev => prev + 1);
+        }
+      }
+    };
     
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [error, isPlaying]);
 
   // Efeito principal de Áudio - Recria o objeto Audio quando streamUrl ou retryKey mudam
@@ -138,8 +154,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         console.log("[AudioPlayer] Event: Pause");
         // Só define como pausado se não estivermos carregando (buffer) ou tentando reconectar intencionalmente
         if (audio.readyState >= 3 || audio.paused) {
-           // Não atualiza estado se estivermos no meio de um retry intencional
-           // (mas aqui não temos acesso fácil ao escopo do handlePlay, então confiamos no unmount)
            setIsPlaying(false);
         }
       };
@@ -231,28 +245,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
   const handlePlay = async () => {
     if (!hasStream) return;
 
-    // Se já estiver tocando, apenas pausa.
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       return;
     }
 
-    // LÓGICA DE "AO VIVO":
-    // Se estiver pausado, força destruição do objeto antigo para não retomar do buffer velho.
     if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.currentTime = 0; // Tenta zerar tempo
+        audioRef.current.currentTime = 0;
     }
 
     console.log("[AudioPlayer] Botão Play: Sincronizando com Ao Vivo...");
     setIsLoading(true);
     setError(null);
-    // Incrementa a chave para forçar o useEffect a rodar novamente e criar nova conexão
     setRetryKey(prev => prev + 1);
   };
 
   return (
-    <div className="fixed bottom-0 left-0 w-full bg-gray-800/95 backdrop-blur-md border-t border-gray-700 p-4 pb-6 md:pb-4 z-50 shadow-2xl">
+    // Design Atualizado: Glassmorphism (Vidro Escuro) e Blur Intenso
+    <div className="fixed bottom-0 left-0 w-full bg-black/60 backdrop-blur-xl border-t border-white/10 p-4 pb-6 md:pb-4 z-50 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-all duration-300">
       <div className="max-w-4xl mx-auto flex items-center justify-between">
         
         {/* Status Info */}
@@ -262,7 +273,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
           </span>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-            <span className="text-sm font-medium text-white">
+            <span className="text-sm font-medium text-white shadow-black drop-shadow-md">
               {!hasStream ? "Sem Sinal" : isLoading ? "Conectando..." : (isPlaying ? "No Ar" : "Toque para ouvir")}
             </span>
           </div>
@@ -273,7 +284,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         <button
           onClick={handlePlay}
           disabled={!hasStream}
-          className={`relative group flex items-center justify-center w-16 h-16 rounded-full shadow-lg hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-blue-500/50 ${
+          className={`relative group flex items-center justify-center w-16 h-16 rounded-full shadow-lg hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-blue-500/30 ${
             !hasStream ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-white text-gray-900'
           }`}
           style={{ color: isPlaying ? '#1f2937' : (!hasStream ? '#9ca3af' : color) }}
@@ -294,8 +305,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
           )}
         </button>
 
-        {/* Visualizer (Decorative) - SEMPRE VISÍVEL (Mobile e Desktop) */}
-        <div className="flex w-20 md:w-24 items-end gap-1 h-8">
+        {/* Visualizer (Decorative) */}
+        <div className="flex w-16 md:w-24 items-end gap-1 h-8">
           {[...Array(5)].map((_, i) => (
             <div
               key={i}

@@ -6,6 +6,10 @@
     <title>Rádio AD Chega Tudo</title>
     <meta name="description" content="Web Rádio Local" />
     
+    <!-- Otimização de Conexão com a Rádio (Zeno FM) -->
+    <link rel="preconnect" href="https://stream.zeno.fm" crossorigin>
+    <link rel="dns-prefetch" href="https://stream.zeno.fm">
+    
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     
@@ -39,19 +43,28 @@
         animation: bounce 1s infinite ease-in-out;
       }
     </style>
-<script type="importmap">
+    
+    <!-- Polyfill para process.env (evita crash se o Vite define falhar no preview) -->
+    <script>
+      window.process = window.process || { env: { API_KEY: '' } };
+    </script>
+
+    <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "react": "https://esm.sh/react@18.2.0",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "@google/genai": "https://esm.sh/@google/genai@0.1.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.2.7",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
 </script>
-</head>
+  </head>
   <body class="bg-gray-900 text-white overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
