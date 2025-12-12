@@ -51,7 +51,8 @@ const CasterPlayer: React.FC<CasterPlayerProps> = ({
 
   return (
     // min-h-[120px] garante que a área do player exista mesmo se o script demorar
-    <div className="w-full bg-gray-900 border-t border-gray-800 min-h-[120px] flex items-center justify-center">
+    // border-b adicionado para separar o header do conteúdo
+    <div className="w-full bg-gray-900 border-b border-gray-800 min-h-[120px] flex items-center justify-center">
       <div ref={containerRef} className="w-full" />
     </div>
   );
