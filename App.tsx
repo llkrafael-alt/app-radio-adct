@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import HeroCarousel from './components/HeroCarousel';
 import CasterPlayer from './components/CasterPlayer';
 import HarpaCrista from './components/HarpaCrista';
@@ -14,12 +14,35 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showHarpa, setShowHarpa] = useState(false);
 
-  useEffect(() => {
-    getRadioConfig().then((data) => {
+  // Função para carregar a configuração
+  const loadConfiguration = useCallback(async (isInitialLoad = false) => {
+    try {
+      const data = await getRadioConfig();
+      
+      // Atualiza o estado. O React cuida de re-renderizar se os dados mudarem.
+      // Em uma aplicação maior, faríamos uma comparação profunda (deep equal) aqui,
+      // mas como o objeto é pequeno, setConfig direto funciona bem.
       setConfig(data);
-      setLoading(false);
-    });
+    } catch (error) {
+      console.error("Erro ao atualizar configuração:", error);
+    } finally {
+      if (isInitialLoad) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // 1. Carregamento inicial imediato
+    loadConfiguration(true);
+
+    // 2. Configura intervalo para checar atualizações a cada 60 segundos
+    const intervalId = setInterval(() => {
+      console.log("[App] Verificando atualizações de configuração...");
+      loadConfiguration(false);
+    }, 60000);
+
+    // Limpeza do intervalo ao desmontar
+    return () => clearInterval(intervalId);
+  }, [loadConfiguration]);
 
   if (loading) {
     return (

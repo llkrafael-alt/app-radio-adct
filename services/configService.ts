@@ -43,7 +43,7 @@ export const getRadioConfig = async (): Promise<RadioConfig & { error?: string }
 
   for (const url of uniqueUrls) {
     try {
-      // Adiciona timestamp para quebrar cache do navegador
+      // Adiciona timestamp para quebrar cache do navegador e forçar leitura nova
       const fetchUrl = `${url}?t=${Date.now()}`;
       
       console.log(`[Config] Buscando: ${fetchUrl}`);
@@ -63,15 +63,37 @@ export const getRadioConfig = async (): Promise<RadioConfig & { error?: string }
         // Mapeamento Flexível
         const foundStreamUrl = json.streamUrl || json.stream || json.url || json.radio || json.link;
         const foundName = json.churchName || json.name || json.title || "Web Rádio";
-        let rawImages = json.images || json.imgs || json.photos || [];
+        
+        // --- LÓGICA DE TRATAMENTO DE IMAGENS ROBUSTA ---
+        let rawImages = json.images || json.imgs || json.photos || json.backgrounds || [];
+        let processedImages: string[] = [];
+
+        if (Array.isArray(rawImages)) {
+            // Se for array (ex: ["url1", "url2"]), limpa strings vazias e não-strings
+            processedImages = rawImages
+                .filter(item => typeof item === 'string' && item.trim() !== "")
+                .map(item => item.trim());
+        } else if (typeof rawImages === 'string') {
+            // Se for string única
+            const trimmed = rawImages.trim();
+            if (trimmed.length > 0) {
+                // Verifica se o usuário separou por vírgula (ex: "url1, url2")
+                if (trimmed.includes(',')) {
+                    processedImages = trimmed.split(',').map(s => s.trim()).filter(s => s !== "");
+                } else {
+                    // É apenas uma URL simples
+                    processedImages = [trimmed];
+                }
+            }
+        }
 
         // FILTRO DE SEGURANÇA: Remove o ícone se ele tiver entrado na lista de imagens por engano
-        const filteredImages = Array.isArray(rawImages) 
-          ? rawImages.filter((img: string) => !img.toLowerCase().includes('icon.png'))
-          : [];
+        const filteredImages = processedImages.filter((img: string) => !img.toLowerCase().includes('icon.png'));
 
         if (foundStreamUrl) {
           console.log("[Config] Sucesso! Configuração válida encontrada na nuvem.");
+          console.log("[Config] Imagens carregadas:", filteredImages);
+          
           return {
             churchName: foundName,
             streamUrl: foundStreamUrl,

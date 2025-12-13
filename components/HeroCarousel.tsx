@@ -8,15 +8,26 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Proteção contra mudanças dinâmicas na lista de imagens
+  // Se a lista atualizar e tiver menos imagens que o índice atual, volta para a primeira
+  useEffect(() => {
+    if (currentIndex >= images.length) {
+      setCurrentIndex(0);
+    }
+  }, [images, currentIndex]);
+
   // Função para avançar
   const nextSlide = useCallback(() => {
+    // Verifica se images existe e tem tamanho > 0 para evitar divisão por zero
+    if (!images || images.length === 0) return;
     setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-  }, [images.length]);
+  }, [images]);
 
   // Função para voltar
   const prevSlide = useCallback(() => {
+    if (!images || images.length === 0) return;
     setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
-  }, [images.length]);
+  }, [images]);
 
   // Efeito de Autoplay (só roda se não estiver pausado)
   useEffect(() => {
@@ -28,6 +39,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
 
     return () => clearInterval(interval);
   }, [isPaused, nextSlide]);
+
+  if (!images || images.length === 0) {
+    return <div className="w-full h-full bg-black" />;
+  }
 
   return (
     <div 
@@ -43,7 +58,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ images }) => {
       {/* Images */}
       {images.map((img, index) => (
         <div
-          key={index}
+          key={`${img}-${index}`} // Key composta para ajudar o React a identificar mudanças
           className={`absolute inset-0 transition-opacity duration-1000 ease-in-out flex items-center justify-center ${
             index === currentIndex ? 'opacity-100' : 'opacity-0'
           }`}
