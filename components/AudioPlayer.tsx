@@ -10,18 +10,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // retryKey serve para forçar o useEffect a rodar de novo e recriar o áudio do zero
   const [retryKey, setRetryKey] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
 
-  // Verifica se existe uma URL válida
   const hasStream = streamUrl && streamUrl.trim() !== '';
 
-  // Configuração da Media Session (Controles na tela de bloqueio/Android)
   useEffect(() => {
     if ('mediaSession' in navigator) {
-      // Verifica se MediaMetadata é suportado antes de instanciar
       if (typeof MediaMetadata !== 'undefined') {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: "Rádio Ao Vivo",
@@ -33,184 +29,85 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
         });
       }
 
-      navigator.mediaSession.setActionHandler('play', () => {
-        handlePlay();
-      });
-
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-      });
-      
-      navigator.mediaSession.setActionHandler('stop', () => {
-         if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-         }
-      });
+      navigator.mediaSession.setActionHandler('play', () => { handlePlay(); });
+      navigator.mediaSession.setActionHandler('pause', () => { if (audioRef.current) audioRef.current.pause(); });
     }
   }, [churchName, retryKey]);
 
-  // Atualiza estado de reprodução na Media Session
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
   }, [isPlaying]);
 
-  // Listener global de rede (Online/Offline) e VISIBILIDADE (Acordar o app)
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log("[AudioPlayer] Rede detectada (Online). Verificando conexão...");
-      if (error || isPlaying) {
-         setRetryKey(prev => prev + 1);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log("[AudioPlayer] App acordou (Visible).");
-        // Se estava tocando e parou misteriosamente (sistema matou o áudio), ou se tem erro, tenta reconectar.
-        // Não forçamos o play se estava pausado intencionalmente, mas preparamos o terreno.
-        if (audioRef.current && isPlaying && audioRef.current.paused) {
-           console.log("[AudioPlayer] Áudio estava pausado pelo sistema. Tentando retomar...");
-           setRetryKey(prev => prev + 1);
-        }
-      }
-    };
-    
-    window.addEventListener('online', handleOnline);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [error, isPlaying]);
-
-  // Efeito principal de Áudio - Recria o objeto Audio quando streamUrl ou retryKey mudam
   useEffect(() => {
     if (!hasStream) {
       setIsPlaying(false);
       setIsLoading(false);
-      setError("Configuração de rádio pendente.");
+      setError("Configuração pendente.");
       return;
     }
 
-    // Limpa timeout de reconexão anterior se existir
     if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-
-    // Limpa instância anterior de áudio
     if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
+        audioRef.current.src = "";
         audioRef.current.load();
         audioRef.current = null;
     }
 
     try {
-      // Adiciona timestamp para evitar cache de conexões mortas/stale
-      const separator = streamUrl.includes('?') ? '&' : '?';
-      const freshUrl = `${streamUrl}${separator}nocache=${Date.now()}`;
-      
-      console.log(`[AudioPlayer] Inicializando stream: ${freshUrl}`);
+      // IMPORTANTE: Removemos o nocache=Date.now() pois o Zeno.fm costuma dar ERRO 4 com parâmetros extras
+      console.log(`[AudioPlayer] Conectando a: ${streamUrl}`);
 
-      const audio = new Audio(freshUrl);
+      const audio = new Audio(streamUrl);
       audio.crossOrigin = "anonymous";
-      
-      // Atributos para mobile e persistência
       audio.setAttribute('playsinline', 'true');
-      audio.setAttribute('webkit-playsinline', 'true');
-      audio.preload = 'auto'; // Força o carregamento para tentar o play imediato
+      audio.preload = 'none'; // Mudado para none para evitar consumo antes do play
       
       audioRef.current = audio;
-      
-      // Hack para impedir que o Android mate o processo de áudio
-      (window as any).radioInstance = audio;
-
-      // Se for uma reconexão (retryKey > 0), tenta dar play automático
-      if (retryKey > 0) {
-        // Pequeno delay para garantir que o objeto está pronto
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(e => {
-                console.warn("Autoplay na reconexão bloqueado ou interrompido:", e);
-                // Se falhar o autoplay, reseta o estado para o usuário clicar de novo
-                setIsLoading(false);
-                setIsPlaying(false);
-            });
-        }
-      }
 
       const onPlay = () => {
-        console.log("[AudioPlayer] Event: Play");
         setIsPlaying(true);
         setIsLoading(false);
         setError(null);
       };
 
       const onPause = () => {
-        console.log("[AudioPlayer] Event: Pause");
-        // Só define como pausado se não estivermos carregando (buffer) ou tentando reconectar intencionalmente
-        if (audio.readyState >= 3 || audio.paused) {
-           setIsPlaying(false);
-        }
+        setIsPlaying(false);
       };
 
       const onWaiting = () => {
-        console.log("[AudioPlayer] Event: Waiting (Buffering)");
         if (isPlaying) setIsLoading(true);
       };
 
       const onPlaying = () => {
-        console.log("[AudioPlayer] Event: Playing");
         setIsPlaying(true);
         setIsLoading(false);
       };
 
       const onError = (e: Event) => {
         const target = e.target as HTMLAudioElement;
-        let errorMessage = "Rádio indisponível.";
-        let shouldRetry = false;
+        let errorMessage = "Erro de conexão.";
         
         if (target.error) {
-            switch (target.error.code) {
-                case 1: 
-                    errorMessage = "Reprodução abortada."; 
-                    break;
-                case 2: 
-                    errorMessage = "Erro de rede. Reconectando..."; 
-                    shouldRetry = true; 
-                    break;
-                case 3: 
-                    errorMessage = "Erro de decodificação. Reconectando..."; 
-                    shouldRetry = true; 
-                    break;
-                case 4: 
-                    errorMessage = "Formato não suportado."; 
-                    break;
-                default: 
-                    errorMessage = `Erro de conexão. Reconectando...`;
-                    shouldRetry = true;
+            if (target.error.code === 4) {
+                errorMessage = "Formato de áudio não suportado ou link offline.";
+            } else {
+                errorMessage = `Erro no sinal (Cod: ${target.error.code}).`;
             }
-            console.error(`[AudioPlayer] Error Code: ${target.error.code}`);
-        } else {
-            // Em HTML5 Audio, erro genérico geralmente é rede
-            shouldRetry = true;
-            errorMessage = "Queda de sinal. Reconectando...";
         }
 
         setIsPlaying(false);
         setIsLoading(false);
         setError(errorMessage);
 
-        if (shouldRetry) {
-            console.log("[AudioPlayer] Agendando reconexão em 3s...");
+        // Tentativa automática de reconexão apenas em erros de rede
+        if (target.error && target.error.code !== 4) {
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = setTimeout(() => {
                 setRetryKey(prev => prev + 1);
-            }, 3000);
+            }, 5000);
         }
       };
 
@@ -220,77 +117,74 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
       audio.addEventListener('waiting', onWaiting);
       audio.addEventListener('error', onError);
 
+      // Autoplay na reconexão
+      if (retryKey > 0) {
+        audio.play().catch(() => {
+          setIsPlaying(false);
+          setIsLoading(false);
+        });
+      }
+
       return () => {
-        console.log("[AudioPlayer] Cleanup");
-        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         audio.pause();
-        audio.removeAttribute('src'); // Garante que o buffer pare de baixar
-        audio.load(); // Reseta o elemento
+        audio.src = "";
         audio.removeEventListener('play', onPlay);
         audio.removeEventListener('playing', onPlaying);
         audio.removeEventListener('pause', onPause);
         audio.removeEventListener('waiting', onWaiting);
         audio.removeEventListener('error', onError);
-        audioRef.current = null;
-        if ((window as any).radioInstance === audio) {
-            (window as any).radioInstance = null;
-        }
       };
     } catch (e) {
-      console.error("Erro crítico ao criar Audio:", e);
-      setError("Erro interno no player.");
+      setError("Falha ao iniciar player.");
     }
   }, [streamUrl, hasStream, retryKey]);
 
-  const handlePlay = async () => {
-    if (!hasStream) return;
+  const handlePlay = () => {
+    if (!hasStream || isLoading) return;
 
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       return;
     }
 
-    if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-    }
-
-    console.log("[AudioPlayer] Botão Play: Sincronizando com Ao Vivo...");
-    setIsLoading(true);
     setError(null);
-    setRetryKey(prev => prev + 1);
+    setIsLoading(true);
+    
+    if (audioRef.current) {
+      // Força recarregamento do src para pegar o stream ao vivo atualizado
+      audioRef.current.load();
+      audioRef.current.play().catch(e => {
+        console.error("Erro ao dar play:", e);
+        setError("Toque novamente para conectar.");
+        setIsLoading(false);
+      });
+    }
   };
 
   return (
-    // Design Atualizado: Glassmorphism (Vidro Escuro) e Blur Intenso
-    <div className="fixed bottom-0 left-0 w-full bg-black/60 backdrop-blur-xl border-t border-white/10 p-4 pb-6 md:pb-4 z-50 shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-all duration-300">
+    <div className="fixed bottom-0 left-0 w-full bg-black/70 backdrop-blur-2xl border-t border-white/10 p-4 pb-8 md:pb-4 z-50 shadow-2xl">
       <div className="max-w-4xl mx-auto flex items-center justify-between">
         
-        {/* Status Info */}
         <div className="flex flex-col">
-          <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">
-            {hasStream ? "Ao Vivo Agora" : "Status"}
-          </span>
+          <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Rádio Ao Vivo</span>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-            <span className="text-sm font-medium text-white shadow-black drop-shadow-md">
-              {!hasStream ? "Sem Sinal" : isLoading ? "Conectando..." : (isPlaying ? "No Ar" : "Toque para ouvir")}
+            <span className="text-sm font-medium text-white">
+              {isLoading ? "Conectando..." : (isPlaying ? "No Ar" : "Pausado")}
             </span>
           </div>
-          {error && <span className="text-xs text-red-400 mt-1 animate-pulse">{error}</span>}
+          {error && <span className="text-[10px] text-red-400 mt-0.5 leading-tight max-w-[140px]">{error}</span>}
         </div>
 
-        {/* Main Control */}
         <button
           onClick={handlePlay}
           disabled={!hasStream}
-          className={`relative group flex items-center justify-center w-16 h-16 rounded-full shadow-lg hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-blue-500/30 ${
-            !hasStream ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-white text-gray-900'
+          className={`relative flex items-center justify-center w-14 h-14 rounded-full transition-all active:scale-90 ${
+            !hasStream ? 'bg-gray-800 text-gray-600' : 'bg-white text-gray-900 shadow-xl'
           }`}
-          style={{ color: isPlaying ? '#1f2937' : (!hasStream ? '#9ca3af' : color) }}
         >
           {isLoading ? (
-             <svg className="animate-spin h-8 w-8 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+             <svg className="animate-spin h-7 w-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
              </svg>
@@ -305,15 +199,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
           )}
         </button>
 
-        {/* Visualizer (Decorative) */}
-        <div className="flex w-16 md:w-24 items-end gap-1 h-8">
-          {[...Array(5)].map((_, i) => (
+        <div className="flex w-12 items-end gap-1 h-6">
+          {[...Array(4)].map((_, i) => (
             <div
               key={i}
-              className={`w-full rounded-t-sm ${isPlaying ? 'visualizer-bar' : 'h-1'}`}
+              className={`w-full rounded-t-sm transition-all ${isPlaying ? 'visualizer-bar' : 'h-1 bg-gray-600'}`}
               style={{ 
-                animationDuration: `${0.6 + i * 0.1}s`,
-                animationPlayState: isPlaying ? 'running' : 'paused',
+                animationDuration: `${0.5 + i * 0.15}s`,
                 backgroundColor: isPlaying ? 'white' : '#4b5563'
               }}
             ></div>
