@@ -18,25 +18,25 @@ const CasterPlayer: React.FC<CasterPlayerProps> = ({
     // 1. Limpa o container para garantir estado limpo
     container.innerHTML = '';
     
-    // 2. Remove qualquer instância anterior do script global para forçar re-execução
+    // 2. Remove qualquer instância anterior do script global
     const existingScripts = document.querySelectorAll('script[src*="caster.fm/widgets/embed.js"]');
     existingScripts.forEach(s => s.remove());
 
-    // 3. Monta a DIV do player exatamente conforme o snippet original
+    // 3. Monta a DIV do player
     const embedDiv = document.createElement('div');
     embedDiv.className = 'cstrEmbed';
     embedDiv.setAttribute('data-type', 'newStreamPlayer');
     embedDiv.setAttribute('data-publicToken', '14acde51-7663-42e2-b46b-2a0a55f871bb');
     embedDiv.setAttribute('data-theme', theme);
-    embedDiv.setAttribute('data-color', primaryColor.replace('#', ''));
+    const cleanColor = primaryColor.startsWith('#') ? primaryColor.substring(1) : primaryColor;
+    embedDiv.setAttribute('data-color', cleanColor);
     embedDiv.setAttribute('data-channelId', '');
-    embedDiv.setAttribute('data-rendered', 'false'); // Importante para o script saber que é novo
+    embedDiv.setAttribute('data-rendered', 'false');
     
-    // Adiciona links de fallback internos (necessário para validação do script em alguns casos)
     embedDiv.innerHTML = `
-      <a href="https://www.caster.fm">Shoutcast Hosting</a> 
-      <a href="https://www.caster.fm">Stream Hosting</a> 
-      <a href="https://www.caster.fm">Radio Server Hosting</a>
+      <a href="https://www.caster.fm" style="display:none">Shoutcast Hosting</a> 
+      <a href="https://www.caster.fm" style="display:none">Stream Hosting</a> 
+      <a href="https://www.caster.fm" style="display:none">Radio Server Hosting</a>
     `;
 
     container.appendChild(embedDiv);
@@ -50,10 +50,8 @@ const CasterPlayer: React.FC<CasterPlayerProps> = ({
   }, [primaryColor, theme]);
 
   return (
-    // min-h-[120px] garante que a área do player exista mesmo se o script demorar
-    // border-b adicionado para separar o header do conteúdo
-    <div className="w-full bg-gray-900 border-b border-gray-800 min-h-[120px] flex items-center justify-center">
-      <div ref={containerRef} className="w-full" />
+    <div className="w-full flex items-center justify-center py-2 px-4 min-h-[100px]">
+      <div ref={containerRef} className="w-full flex justify-center" />
     </div>
   );
 };
