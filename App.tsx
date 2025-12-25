@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import HeroCarousel from './components/HeroCarousel';
 import AudioPlayer from './components/AudioPlayer';
@@ -64,11 +65,9 @@ const App: React.FC = () => {
           <CasterPlayer />
         </section>
 
-        {/* 2. CARROSSEL (MEIO - ALTURA DINÂMICA) */}
+        {/* 2. CARROSSEL (MEIO) */}
         <section className="flex-1 w-full relative min-h-0">
           <HeroCarousel images={config.images} />
-          {/* Overlay gradiente suave na base */}
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#030712] to-transparent pointer-events-none z-20"></div>
         </section>
 
         {/* 3. PLAYER ORIGINAL (FIXO NA BASE) */}
