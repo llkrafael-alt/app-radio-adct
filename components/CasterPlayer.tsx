@@ -4,6 +4,26 @@ import React, { useEffect, useRef } from 'react';
 const CasterPlayer: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Função para parar qualquer áudio interno do Caster
+  const stopCasterAudio = () => {
+    if (containerRef.current) {
+      const audios = containerRef.current.querySelectorAll('audio');
+      audios.forEach(a => {
+        a.pause();
+        a.currentTime = 0;
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handleStopExternal = () => {
+      stopCasterAudio();
+    };
+
+    window.addEventListener('stop-external-audio', handleStopExternal);
+    return () => window.removeEventListener('stop-external-audio', handleStopExternal);
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -40,14 +60,25 @@ const CasterPlayer: React.FC = () => {
     };
   }, []);
 
+  // Ao clicar na área do Caster, paramos o player nativo (se existir)
+  const handleInteraction = () => {
+    window.dispatchEvent(new CustomEvent('stop-native-audio'));
+  };
+
   return (
-    <div className="w-full bg-black/20 py-3 flex flex-col items-center">
+    <div 
+      className="w-full bg-black/40 py-2 flex flex-col items-center border-b border-white/5 shadow-lg relative z-20"
+      onClick={handleInteraction}
+    >
       <div className="w-full max-w-xl px-4">
-        <div className="flex items-center gap-1.5 mb-1.5 px-2">
-          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30">Player Digital</span>
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-400">Player Oficial</span>
         </div>
-        <div ref={containerRef} className="w-full min-h-[100px] rounded-lg overflow-hidden bg-black/40 border border-white/5" />
+        <div 
+          ref={containerRef} 
+          className="w-full min-h-[120px] rounded-xl overflow-hidden bg-black/60 border border-white/10 shadow-inner" 
+        />
       </div>
     </div>
   );

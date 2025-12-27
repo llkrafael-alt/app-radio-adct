@@ -15,6 +15,19 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
 
   const hasStream = streamUrl && streamUrl.trim() !== '';
 
+  // Efeito para gerenciar a exclusividade do áudio
+  useEffect(() => {
+    const stopNative = () => {
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    };
+
+    window.addEventListener('stop-native-audio', stopNative);
+    return () => window.removeEventListener('stop-native-audio', stopNative);
+  }, []);
+
   useEffect(() => {
     if (!hasStream) return;
 
@@ -28,7 +41,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ streamUrl, churchName, color 
     audio.setAttribute('playsinline', 'true');
     audioRef.current = audio;
 
-    const onPlay = () => { setIsPlaying(true); setIsLoading(false); };
+    const onPlay = () => { 
+      setIsPlaying(true); 
+      setIsLoading(false); 
+      // Notifica outros players para pararem
+      window.dispatchEvent(new CustomEvent('stop-external-audio'));
+    };
     const onPause = () => { setIsPlaying(false); };
     const onError = () => { setIsPlaying(false); setIsLoading(false); setError("Erro no sinal"); };
 
